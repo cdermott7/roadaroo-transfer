@@ -1,0 +1,183 @@
+db.users.aggregate([
+  {
+    $match: {
+      role: "driver"
+    }
+  },
+  {
+    $lookup: {
+      from: "driverdocuments",
+      localField: "_id",
+      foreignField: "userId",
+      as: "documents"
+    }
+  },
+  {
+    $lookup: {
+      from: "vehicletypes",
+      localField: "vehicleTypeId",
+      foreignField: "_id",
+      as: "vehicleType"
+    }
+  },
+  {
+    $lookup: {
+      from: "vehiclebrands",
+      localField: "vehicleBrandId",
+      foreignField: "_id",
+      as: "vehicleMake"
+    }
+  },
+  {
+    $project: {
+      ID: { $toString: "$_id" },
+      email: 1,
+      phone: 1,
+      stripeConnectId: 1,
+      isPhoneVerified: "$isPhoneVerify",
+      isEmailVerified: "$isEmailVerify",
+      isApproved: 1,
+      vehicleType: {
+        $cond: {
+          if: { $ne: ["$vehicleType", []] },
+          then: { $arrayElemAt: ["$vehicleType.name", 0] },
+          else: ""
+        }
+      },
+      vehicleMake: {
+        $cond: {
+          if: { $ne: ["$vehicleMake", []] },
+          then: { $arrayElemAt: ["$vehicleMake.name", 0] },
+          else: ""
+        }
+      },
+      vehicleModel: "",
+      vehicleColor: "",
+      licensePlateNo: "$vehicleNumber",
+      license: {
+        $cond: {
+          if: {
+            $in: ["Driver license", "$documents.type"]
+          },
+          then: {
+            $concat: [
+              '["',
+              { $toString: { $arrayElemAt: ["$documents.image", 0] } },
+              '", "',
+              { $toString: { $arrayElemAt: ["$documents.backImage", 0] } },
+              '"]'
+            ]
+          },
+          else: ""
+        }
+      },
+      licenseExpiry: {
+        $cond: {
+          if: {
+            $in: ["Driver license", "$documents.type"]
+          },
+          then: { $toString: { $arrayElemAt: ["$documents.expiresAt", 0] } },
+          else: ""
+        }
+      },
+      insurance: {
+        $cond: {
+          if: {
+            $in: ["Vehicle registration", "$documents.type"]
+          },
+          then: {
+            $concat: [
+              '["',
+              { $toString: { $arrayElemAt: ["$documents.image", 0] } },
+              '", "',
+              { $toString: { $arrayElemAt: ["$documents.backImage", 0] } },
+              '"]'
+            ]
+          },
+          else: ""
+        }
+      },
+      insuranceExpiry: {
+        $cond: {
+          if: {
+            $in: ["Vehicle registration", "$documents.type"]
+          },
+          then: { $toString: { $arrayElemAt: ["$documents.expiresAt", 0] } },
+          else: ""
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      ID: 1,
+      email: 1,
+      phone: 1,
+      stripeConnectId: 1,
+      isPhoneVerified: 1,
+      isEmailVerified: 1,
+      isApproved: 1,
+      vehicleType: {
+        $concat: [
+          '{"type": "',
+          "$vehicleType",
+          '", '
+        ]
+      },
+      vehicleMake: {
+        $concat: [
+          '"make": "',
+          "$vehicleMake",
+          '", '
+        ]
+      },
+      vehicleModel: "",
+      vehicleColor: "",
+      licensePlateNo: {
+        $concat: [
+          '"plate": "',
+          "$licensePlateNo",
+          '"}'
+        ]
+      },
+      license: 1,
+      licenseExpiry: 1,
+      insurance: 1,
+      insuranceExpiry: 1,
+      phoneVerified: "$isPhoneVerified",
+      emailVerified: "$isEmailVerified",
+      licenseApproved: {
+        $cond: {
+          if: {
+            $and: [
+              { $eq: ["Driver license", { $arrayElemAt: ["$documents.type", 0] }] },
+              { $eq: [{ $arrayElemAt: ["$documents.isVerify", 0] }, true] }
+            ]
+          },
+          then: true,
+          else: false
+        }
+      },
+      vehicleApproved: {
+        $cond: {
+          if: {
+            $and: [
+              { $eq: ["Vehicle registration", { $arrayElemAt: ["$documents.type", 0] }] },
+              { $eq: [{ $arrayElemAt: ["$documents.isVerify", 0] }, true] }
+            ]
+          },
+          then: true,
+          else: false
+        }
+      },
+      stripeComplete: {
+        $cond: {
+          if: { $regexMatch: { input: "$stripeConnectId", regex: "^acct" } },
+          then: true,
+          else: false
+        }
+      },
+      approved: "$isApproved"
+    }
+  }
+]);
